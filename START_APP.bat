@@ -22,4 +22,7 @@ echo  NOTE: Keep this window open while using the app.
 echo  Press Ctrl+C to stop the server.
 echo.
 
-php -S localhost:8000 -t "%~dp0."
+set PHP_BIN=php
+if exist "c:\xampp\php\php.exe" set PHP_BIN=c:\xampp\php\php.exe
+
+"%PHP_BIN%" -S localhost:8000 -t "%~dp0."
