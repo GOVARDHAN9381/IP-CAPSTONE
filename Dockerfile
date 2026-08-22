@@ -20,7 +20,10 @@ RUN mkdir -p /var/www/html/assets/uploads \
 
 # Copy and setup entrypoint script for dynamic port binding (Render/Railway $PORT)
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN sed -i -e 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && a2dismod -f mpm_event mpm_worker 2>/dev/null || true \
+    && a2enmod mpm_prefork 2>/dev/null || true
 
 # Expose default port
 EXPOSE 80 8080
