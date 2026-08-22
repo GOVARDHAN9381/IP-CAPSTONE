@@ -51,7 +51,14 @@ define('BASE_URL', '/ipcapstone');
 
 ## Step 4 — Run the App
 
-Open your browser: **http://localhost/ipcapstone/**
+**Option A (Fastest - One Click):**
+Double-click **`START_APP.bat`** in the project folder.
+
+**Option B (Command Line):**
+```bash
+php -S localhost:8000
+```
+Open your browser: **[http://localhost:8000](http://localhost:8000)**
 
 ---
 
