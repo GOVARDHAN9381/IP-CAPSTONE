@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: collabiq-platform
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DB_HOST
+        value: db.sbzecviaqezsbouymecf.supabase.co
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        value: postgres
+      - key: DB_USER
+        value: postgres
+      - key: DB_PASS
+        sync: false
+      - key: BASE_URL
+        value: ""

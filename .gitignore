@@ -1,0 +1,12 @@
+# Local XAMPP directory
+/xampp/
+
+# Temporary files & logs
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Uploaded assets if any local
+/assets/uploads/*.tmp

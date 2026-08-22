@@ -1,0 +1,7 @@
+xampp/
+.git/
+.gitignore
+START_APP.bat
+*.log
+.DS_Store
+Thumbs.db
