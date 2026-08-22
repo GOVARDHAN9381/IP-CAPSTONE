@@ -34,12 +34,64 @@ define('UPLOAD_DIR', __DIR__ . '/../assets/uploads/');
 define('MAX_FILE_SIZE', 10 * 1024 * 1024); // 10 MB
 
 /**
- * Returns a singleton PDO connection (local MySQL first, then Supabase PostgreSQL fallback).
+ * Returns a singleton PDO connection (Supabase PostgreSQL / Cloud DB or local MySQL).
  */
 function getDB(): PDO {
     static $pdo = null;
     if ($pdo === null) {
-        // Step 1: Try local XAMPP MySQL/MariaDB first (Fast & offline-ready)
+        // Step 1: Check for DATABASE_URL environment variable (common in Railway/Render/Heroku)
+        $databaseUrl = getenv('DATABASE_URL');
+        if ($databaseUrl) {
+            try {
+                $dbParts = parse_url($databaseUrl);
+                $pgHost = $dbParts['host'] ?? DB_HOST;
+                $pgPort = $dbParts['port'] ?? 5432;
+                $pgUser = urldecode($dbParts['user'] ?? DB_USER);
+                $pgPass = urldecode($dbParts['pass'] ?? DB_PASS);
+                $pgName = ltrim($dbParts['path'] ?? 'postgres', '/');
+
+                $dsnPg = sprintf('pgsql:host=%s;port=%s;dbname=%s;sslmode=require', $pgHost, $pgPort, $pgName);
+                $pdo = new PDO($dsnPg, $pgUser, $pgPass, [
+                    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_PERSISTENT         => false,
+                    PDO::ATTR_TIMEOUT            => 10,
+                ]);
+                return $pdo;
+            } catch (PDOException $eDbUrl) {
+                error_log('DATABASE_URL connection failed: ' . $eDbUrl->getMessage());
+            }
+        }
+
+        // Step 2: In cloud environments (Railway, Render) or when DB_HOST is explicitly configured
+        $isCloud = getenv('RAILWAY_ENVIRONMENT') || getenv('RENDER') || (getenv('DB_HOST') && getenv('DB_HOST') !== '127.0.0.1');
+
+        if ($isCloud) {
+            try {
+                $dsnPg = sprintf(
+                    'pgsql:host=%s;port=%s;dbname=%s;sslmode=require',
+                    DB_HOST, DB_PORT, DB_NAME
+                );
+                $pdo = new PDO($dsnPg, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_PERSISTENT         => false,
+                    PDO::ATTR_TIMEOUT            => 10,
+                ]);
+                return $pdo;
+            } catch (PDOException $ePg) {
+                error_log('Supabase DB connection failed: ' . $ePg->getMessage());
+                http_response_code(500);
+                die('<div style="font-family:sans-serif;padding:30px;max-width:600px;margin:auto;background:#fee2e2;border:1px solid #ef4444;border-radius:10px;color:#991b1b;">'
+                  . '<h3 style="margin-top:0;">Database Connection Error</h3>'
+                  . '<p>Could not connect to Supabase PostgreSQL at <code>' . htmlspecialchars(DB_HOST) . '</code>.</p>'
+                  . '<p><strong>Details:</strong> ' . htmlspecialchars($ePg->getMessage()) . '</p>'
+                  . '<p>Please check your Railway <strong>Variables</strong> tab for <code>DB_HOST</code>, <code>DB_USER</code>, and <code>DB_PASS</code>.</p>'
+                  . '</div>');
+            }
+        }
+
+        // Step 3: Local Development (Try local MySQL first, then Supabase PostgreSQL)
         $mysqlPorts = [3308, 3306];
         foreach ($mysqlPorts as $port) {
             try {
@@ -55,7 +107,7 @@ function getDB(): PDO {
             }
         }
 
-        // Step 2: Fallback to Supabase PostgreSQL Cloud DB
+        // Local fallback to Supabase PostgreSQL
         try {
             $dsnPg = sprintf(
                 'pgsql:host=%s;port=%s;dbname=%s;sslmode=require',
@@ -65,12 +117,12 @@ function getDB(): PDO {
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_PERSISTENT         => false,
-                PDO::ATTR_TIMEOUT            => 2,
+                PDO::ATTR_TIMEOUT            => 5,
             ]);
         } catch (PDOException $ePg) {
             error_log('DB Connection failed: ' . $ePg->getMessage());
             http_response_code(500);
-            die('Database connection error. Please ensure local XAMPP MySQL is started.');
+            die('Database connection error. Please ensure local XAMPP MySQL is started or check Supabase credentials.');
         }
     }
     return $pdo;
