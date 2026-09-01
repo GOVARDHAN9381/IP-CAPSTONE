@@ -81,6 +81,23 @@ if ($viewStudent) {
     <nav class="nav">
         <div class="nav-brand">🧠 Collab<span class="gradient-text">IQ</span></div>
         <div class="nav-user">
+            <!-- Notification Bell -->
+            <div class="notif-bell-wrap" id="notif-wrap" style="position:relative;">
+                <button class="btn btn-ghost btn-sm" id="notif-btn"
+                        onclick="toggleNotifPanel()"
+                        style="position:relative;padding:.4rem .6rem;font-size:1.1rem;">
+                    🔔
+                    <span class="notif-badge" id="notif-badge" style="display:none;">0</span>
+                </button>
+                <div class="notif-panel" id="notif-panel" style="display:none;">
+                    <div class="notif-panel-header">
+                        <span style="font-weight:700;">🔔 Notifications</span>
+                        <button onclick="markAllRead()" class="btn btn-ghost btn-sm"
+                                style="font-size:.75rem;padding:.2rem .5rem;">Mark all read</button>
+                    </div>
+                    <div id="notif-list"><div style="padding:1.5rem;text-align:center;color:#8b949e;font-size:.85rem;">Loading…</div></div>
+                </div>
+            </div>
             <span style="font-size:.85rem;color:var(--text-muted);">Faculty</span>
             <span class="nav-name"><?= sanitize($faculty['name']) ?></span>
             <a href="<?= BASE_URL ?>/auth/logout.php" class="btn btn-ghost btn-sm">Sign Out</a>
@@ -94,6 +111,10 @@ if ($viewStudent) {
                 <a href="<?= BASE_URL ?>/faculty/dashboard.php" class="sidebar-link"><span class="icon">📊</span> Analytics Dashboard</a>
                 <a href="<?= BASE_URL ?>/faculty/students.php" class="sidebar-link active"><span class="icon">👥</span> Student Reports</a>
                 <a href="<?= BASE_URL ?>/faculty/report.php" class="sidebar-link"><span class="icon">🖨️</span> Print Report</a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-label">Community</div>
+                <a href="<?= BASE_URL ?>/ideas/index.php" class="sidebar-link"><span class="icon">💡</span> Ideas Board</a>
             </div>
         </aside>
 
@@ -214,5 +235,61 @@ if ($viewStudent) {
     </div>
     <script>window.APP_BASE = '<?= BASE_URL ?>';</script>
     <script src="<?= BASE_URL ?>/assets/js/main.js"></script>
+    <script>
+    // ── Notification Bell (Faculty) ─────────────────────────────
+    let notifOpen = false;
+    function toggleNotifPanel() {
+        const panel = document.getElementById('notif-panel');
+        notifOpen = !notifOpen;
+        panel.style.display = notifOpen ? 'block' : 'none';
+        if (notifOpen) loadNotifications();
+    }
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('notif-wrap');
+        if (wrap && !wrap.contains(e.target)) {
+            document.getElementById('notif-panel').style.display = 'none';
+            notifOpen = false;
+        }
+    });
+    function loadNotifications() {
+        fetch(APP_BASE + '/api/notifications.php?limit=8')
+            .then(r => r.json()).then(d => {
+                const list = document.getElementById('notif-list');
+                if (!d.notifications || !d.notifications.length) {
+                    list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#8b949e;font-size:.85rem;">🎉 No notifications.</div>';
+                    return;
+                }
+                list.innerHTML = d.notifications.map(n => `
+                    <a href="${n.link ? APP_BASE + n.link : '#'}" class="notif-item ${n.is_read == 0 ? 'unread' : ''}"
+                       onclick="markOneRead(${n.id})">
+                        <div class="notif-msg">${n.message}</div>
+                        <div class="notif-time">${n.created_at}</div>
+                    </a>`).join('');
+            }).catch(() => {});
+    }
+    function markOneRead(id) {
+        const fd = new FormData(); fd.append('type','single'); fd.append('id', id);
+        fetch(APP_BASE + '/api/notify_read.php', {method:'POST', body:fd});
+    }
+    function markAllRead() {
+        const fd = new FormData(); fd.append('type','all');
+        fetch(APP_BASE + '/api/notify_read.php', {method:'POST', body:fd}).then(() => {
+            document.getElementById('notif-badge').style.display = 'none';
+            loadNotifications();
+        });
+    }
+    function pollUnread() {
+        fetch(APP_BASE + '/api/notifications.php?unread_only=1')
+            .then(r => r.json()).then(d => {
+                const badge = document.getElementById('notif-badge');
+                if (d.unread > 0) {
+                    badge.textContent = d.unread > 9 ? '9+' : d.unread;
+                    badge.style.display = 'flex';
+                } else { badge.style.display = 'none'; }
+            }).catch(() => {});
+    }
+    pollUnread();
+    setInterval(pollUnread, 60000);
+    </script>
 </body>
 </html>

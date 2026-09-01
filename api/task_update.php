@@ -30,9 +30,34 @@ if ($taskData['assigned_to'] != $studentId && $taskData['role'] !== 'leader') {
     echo json_encode(['error' => 'Not authorized']); exit;
 }
 
-// Update status — use CURRENT_TIMESTAMP for cross-DB compatibility
+// Update status
 $db->prepare("UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
    ->execute([$status, $taskId]);
+
+// ── Activity Logging ─────────────────────────────────────────
+$icons  = ['pending' => '🔁', 'in_progress' => '⚡', 'completed' => '✅'];
+$labels = ['pending' => 'Pending', 'in_progress' => 'In Progress', 'completed' => 'Completed'];
+$detail = "Task \"{$taskData['title']}\" marked as {$labels[$status]}";
+try {
+    $db->prepare("INSERT INTO activity_log (student_id, project_id, action_type, detail, icon) VALUES (?,?,?,?,?)")
+       ->execute([$studentId, $taskData['project_id'], 'task_status_changed', $detail, $icons[$status]]);
+} catch (\Throwable $e) { /* silently skip if table not migrated yet */ }
+
+// ── Notify project leader if a team member completed a task ──
+if ($status === 'completed' && $taskData['role'] !== 'leader') {
+    try {
+        $me = $db->prepare("SELECT name FROM students WHERE id=?")->execute([$studentId]) ? null : null;
+        $meName = $_SESSION['student']['name'] ?? 'A team member';
+        $leader = $db->prepare("SELECT student_id FROM project_members WHERE project_id=? AND role='leader'");
+        $leader->execute([$taskData['project_id']]);
+        $leaderId = $leader->fetchColumn();
+        if ($leaderId && $leaderId != $studentId) {
+            $msg = "✅ {$meName} completed task \"{$taskData['title']}\"";
+            $db->prepare("INSERT INTO notifications (student_id,type,message,link) VALUES (?,?,?,?)")
+               ->execute([$leaderId, 'task_completed', $msg, BASE_URL.'/project/view.php?id='.$taskData['project_id']]);
+        }
+    } catch (\Throwable $e) { /* silently skip */ }
+}
 
 // Recalculate progress
 $projectId = $taskData['project_id'];

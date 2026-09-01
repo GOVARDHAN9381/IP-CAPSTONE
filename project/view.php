@@ -73,6 +73,13 @@ $created  = isset($_GET['created']);
 
 // Status label map
 $statusColors = ['planning'=>'badge-violet','active'=>'badge-cyan','completed'=>'badge-emerald'];
+
+// Milestones
+try {
+    $msStmt = $db->prepare("SELECT * FROM milestones WHERE project_id=? ORDER BY target_date ASC, created_at ASC");
+    $msStmt->execute([$projId]);
+    $milestones = $msStmt->fetchAll();
+} catch (\Throwable $e) { $milestones = []; }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -102,6 +109,8 @@ $statusColors = ['planning'=>'badge-violet','active'=>'badge-cyan','completed'=>
                 <a href="<?= BASE_URL ?>/student/dashboard.php" class="sidebar-link"><span class="icon">🏠</span> Dashboard</a>
                 <a href="<?= BASE_URL ?>/student/profile.php" class="sidebar-link"><span class="icon">👤</span> My Profile</a>
                 <a href="<?= BASE_URL ?>/student/recommendations.php" class="sidebar-link"><span class="icon">🤖</span> AI Recommendations</a>
+                <a href="<?= BASE_URL ?>/student/activity.php" class="sidebar-link"><span class="icon">📊</span> Activity Feed</a>
+                <a href="<?= BASE_URL ?>/ideas/index.php" class="sidebar-link"><span class="icon">💡</span> Idea Board</a>
             </div>
             <div class="sidebar-section">
                 <div class="sidebar-label">Projects</div>
@@ -313,9 +322,75 @@ $statusColors = ['planning'=>'badge-violet','active'=>'badge-cyan','completed'=>
                     </div>
                 </div>
             </div>
+
+            <!-- ── Milestones ── -->
+            <div class="data-card" style="margin-top:1.5rem;">
+                <div class="data-card-header">
+                    <h3 class="data-card-title">🏆 Milestones</h3>
+                    <?php if ($isLeader): ?>
+                    <button class="btn btn-primary btn-sm" onclick="document.getElementById('add-milestone-form').classList.toggle('hidden')">➕ Add</button>
+                    <?php endif; ?>
+                </div>
+                <div class="data-card-body">
+                    <!-- Add milestone form (leader only) -->
+                    <?php if ($isLeader): ?>
+                    <div id="add-milestone-form" class="hidden" style="background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:1.25rem;margin-bottom:1.25rem;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:.8rem;">Milestone Title *</label>
+                                <input type="text" id="ms-title" class="form-input" placeholder="e.g. MVP Complete" style="margin:0;">
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:.8rem;">Target Date</label>
+                                <input type="date" id="ms-date" class="form-input" style="margin:0;">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin:.75rem 0 0;">
+                            <label class="form-label" style="font-size:.8rem;">Description (optional)</label>
+                            <input type="text" id="ms-desc" class="form-input" placeholder="What does this milestone represent?" style="margin:0;">
+                        </div>
+                        <button class="btn btn-primary btn-sm" style="margin-top:.75rem;" onclick="addMilestone(<?= $projId ?>)">Save Milestone</button>
+                        <button class="btn btn-ghost btn-sm" style="margin-top:.75rem;" onclick="document.getElementById('add-milestone-form').classList.add('hidden')">Cancel</button>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Milestones Timeline -->
+                    <?php if (empty($milestones)): ?>
+                    <div class="empty-state" style="padding:1.5rem 0;">
+                        <div class="empty-state-icon">🏆</div>
+                        <p><?= $isLeader ? 'Add your first milestone to track project progress.' : 'No milestones set yet.' ?></p>
+                    </div>
+                    <?php else: ?>
+                    <div id="milestones-list" style="display:flex;flex-direction:column;gap:.75rem;">
+                        <?php
+                        $msColors = ['upcoming'=>'#8b949e','in_progress'=>'#f59e0b','completed'=>'#10b981'];
+                        $msIcons  = ['upcoming'=>'⏳','in_progress'=>'⚡','completed'=>'✅'];
+                        foreach($milestones as $ms):
+                            $statusCls = $ms['status'] === 'completed' ? 'badge-emerald' : ($ms['status'] === 'in_progress' ? 'badge-amber' : 'badge-gray');
+                        ?>
+                        <div class="milestone-item" id="ms-<?= $ms['id'] ?>" style="display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);border-radius:var(--radius-md);border-left:3px solid <?= $msColors[$ms['status']] ?>;">
+                            <span style="font-size:1.5rem;"><?= $msIcons[$ms['status']] ?></span>
+                            <div style="flex:1;">
+                                <div style="font-weight:600;font-size:.95rem;<?= $ms['status']==='completed'?'text-decoration:line-through;opacity:.7;':'' ?>"><?= sanitize($ms['title']) ?></div>
+                                <?php if($ms['description']): ?><div class="text-xs text-muted" style="margin-top:.2rem;"><?= sanitize($ms['description']) ?></div><?php endif; ?>
+                                <?php if($ms['target_date']): ?><div class="text-xs text-muted" style="margin-top:.2rem;">🎯 <?= date('M d, Y', strtotime($ms['target_date'])) ?></div><?php endif; ?>
+                            </div>
+                            <span class="badge <?= $statusCls ?>"><?= ucfirst(str_replace('_',' ',$ms['status'])) ?></span>
+                            <select class="btn btn-ghost btn-sm" style="cursor:pointer;font-size:.78rem;" onchange="updateMilestone(<?= $ms['id'] ?>,this.value)">
+                                <option value="upcoming"  <?= $ms['status']==='upcoming'?'selected':'' ?>>⏳ Upcoming</option>
+                                <option value="in_progress" <?= $ms['status']==='in_progress'?'selected':'' ?>>⚡ In Progress</option>
+                                <option value="completed" <?= $ms['status']==='completed'?'selected':'' ?>>✅ Completed</option>
+                            </select>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
         </main>
     </div>
 
+    <style>.hidden{display:none!important;}</style>
     <script src="<?= BASE_URL ?>/assets/js/main.js"></script>
     <script>
     // Inject base URL for JS AJAX calls
@@ -345,5 +420,36 @@ $statusColors = ['planning'=>'badge-violet','active'=>'badge-cyan','completed'=>
         .catch(() => showToast('❌ Network error', 'error'));
     }
     </script>
+    <script>
+    const CSRF_TOKEN = '<?= csrfToken() ?>';
+    function addMilestone(projId) {
+        const title = document.getElementById('ms-title').value.trim();
+        const desc  = document.getElementById('ms-desc').value.trim();
+        const date  = document.getElementById('ms-date').value;
+        if (!title) { showToast('Please enter a title', 'error'); return; }
+        const fd = new FormData();
+        fd.append('action','add'); fd.append('project_id',projId);
+        fd.append('title',title); fd.append('description',desc);
+        fd.append('target_date',date); fd.append('csrf_token',CSRF_TOKEN);
+        fetch(APP_BASE+'/api/milestone_update.php',{method:'POST',body:fd})
+            .then(r=>r.json()).then(d=>{
+                if(d.success){showToast('🏆 Milestone added!','success');setTimeout(()=>location.reload(),700);}
+                else showToast('❌ '+(d.error||'Error'),'error');
+            });
+    }
+    function updateMilestone(msId, status) {
+        const fd = new FormData();
+        fd.append('action','update'); fd.append('milestone_id',msId);
+        fd.append('status',status); fd.append('csrf_token',CSRF_TOKEN);
+        fetch(APP_BASE+'/api/milestone_update.php',{method:'POST',body:fd})
+            .then(r=>r.json()).then(d=>{
+                if(d.success){showToast('✅ Milestone updated!','success');setTimeout(()=>location.reload(),500);}
+                else showToast('❌ '+(d.error||'Error'),'error');
+            });
+    }
+    </script>
+    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/chatbot.css">
+    <script>window.CHATBOT_CONTEXT={name:'<?= sanitize(explode(' ',$student['name'])[0]) ?>',page:'project',projectName:'<?= sanitize($project['name']) ?>'};</script>
+    <script src="<?= BASE_URL ?>/assets/js/chatbot.js"></script>
 </body>
 </html>

@@ -71,6 +71,20 @@ $welcome = isset($_GET['welcome']);
     <nav class="nav">
         <div class="nav-brand">🧠 Collab<span class="gradient-text">IQ</span></div>
         <div class="nav-user">
+            <!-- Notification Bell -->
+            <div class="notif-bell-wrap" id="notif-wrap" style="position:relative;">
+                <button class="btn btn-ghost btn-sm" id="notif-btn" onclick="toggleNotifPanel()" style="position:relative;padding:.4rem .6rem;font-size:1.1rem;">
+                    🔔
+                    <span class="notif-badge" id="notif-badge" style="display:none;">0</span>
+                </button>
+                <div class="notif-panel" id="notif-panel" style="display:none;">
+                    <div class="notif-panel-header">
+                        <span style="font-weight:700;">🔔 Notifications</span>
+                        <button onclick="markAllRead()" class="btn btn-ghost btn-sm" style="font-size:.75rem;padding:.2rem .5rem;">Mark all read</button>
+                    </div>
+                    <div id="notif-list"><div style="padding:1.5rem;text-align:center;color:#8b949e;font-size:.85rem;">Loading…</div></div>
+                </div>
+            </div>
             <img src="<?= generateAvatar($student['name']) ?>" class="nav-avatar" alt="<?= sanitize($student['name']) ?>">
             <span class="nav-name"><?= sanitize($student['name']) ?></span>
             <a href="<?= BASE_URL ?>/auth/logout.php" class="btn btn-ghost btn-sm">Sign Out</a>
@@ -90,6 +104,12 @@ $welcome = isset($_GET['welcome']);
                 </a>
                 <a href="<?= BASE_URL ?>/student/recommendations.php" class="sidebar-link">
                     <span class="icon">🤖</span> AI Recommendations
+                </a>
+                <a href="<?= BASE_URL ?>/student/activity.php" class="sidebar-link">
+                    <span class="icon">📊</span> Activity Feed
+                </a>
+                <a href="<?= BASE_URL ?>/ideas/index.php" class="sidebar-link">
+                    <span class="icon">💡</span> Idea Board
                 </a>
             </div>
             <div class="sidebar-section">
@@ -267,5 +287,69 @@ $welcome = isset($_GET['welcome']);
 
     <script>window.APP_BASE = '<?= BASE_URL ?>';</script>
     <script src="<?= BASE_URL ?>/assets/js/main.js"></script>
+    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/chatbot.css">
+    <script>
+    window.CHATBOT_CONTEXT = {
+        name:        '<?= sanitize(explode(' ',$student['name'])[0]) ?>',
+        page:        'dashboard',
+        projects:    <?= count($myProjects) ?>,
+        pending:     <?= count($myTasks) ?>,
+        done:        <?= $doneCnt ?>,
+        score:       <?= $collabScore ?>,
+        skills:      <?= count($mySkills) ?>
+    };
+    </script>
+    <script src="<?= BASE_URL ?>/assets/js/chatbot.js"></script>
+    <script>
+    // ── Notification Bell ─────────────────────────────────────
+    let notifOpen = false;
+    function toggleNotifPanel() {
+        const panel = document.getElementById('notif-panel');
+        notifOpen = !notifOpen;
+        panel.style.display = notifOpen ? 'block' : 'none';
+        if (notifOpen) loadNotifications();
+    }
+    document.addEventListener('click', function(e) {
+        if (!document.getElementById('notif-wrap')?.contains(e.target)) {
+            document.getElementById('notif-panel').style.display = 'none';
+            notifOpen = false;
+        }
+    });
+    function loadNotifications() {
+        fetch(APP_BASE + '/api/notifications.php?all=1')
+            .then(r => r.json()).then(d => {
+                const list = document.getElementById('notif-list');
+                if (!d.notifications || !d.notifications.length) {
+                    list.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#8b949e;font-size:.85rem;">🎉 All caught up! No notifications.</div>';
+                    return;
+                }
+                list.innerHTML = d.notifications.map(n => `
+                    <a href="${n.link || '#'}" class="notif-item ${n.is_read == 0 ? 'unread' : ''}">
+                        <div class="notif-msg">${n.message}</div>
+                        <div class="notif-time">${n.created_at}</div>
+                    </a>`).join('');
+            }).catch(() => {});
+    }
+    function markAllRead() {
+        fetch(APP_BASE + '/api/notifications.php?mark_read=1').then(() => {
+            document.getElementById('notif-badge').style.display = 'none';
+            loadNotifications();
+        });
+    }
+    function pollUnread() {
+        fetch(APP_BASE + '/api/notifications.php?unread_only=1')
+            .then(r => r.json()).then(d => {
+                const badge = document.getElementById('notif-badge');
+                if (d.unread > 0) {
+                    badge.textContent = d.unread > 9 ? '9+' : d.unread;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }).catch(() => {});
+    }
+    pollUnread();
+    setInterval(pollUnread, 60000); // poll every 60 seconds
+    </script>
 </body>
 </html>

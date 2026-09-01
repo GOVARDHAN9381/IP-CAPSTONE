@@ -273,3 +273,119 @@ style.textContent = `
 }
 `;
 document.head.appendChild(style);
+
+// ══════════════════════════════════════════════════════════════
+//  🔔  Notification Bell System
+// ══════════════════════════════════════════════════════════════
+
+const NotifSystem = (() => {
+    let pollTimer = null;
+
+    // Fetch unread count + recent list
+    function fetchNotifications() {
+        const bell = document.getElementById('notif-bell');
+        if (!bell) return; // page has no bell → skip
+
+        fetch(`${window.APP_BASE}/api/notifications.php?limit=8`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                updateBadge(data.unread_count ?? 0);
+                renderDropdown(data.notifications ?? []);
+            })
+            .catch(() => {/* silently ignore network errors */});
+    }
+
+    function updateBadge(count) {
+        const badge = document.getElementById('notif-badge');
+        if (!badge) return;
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    function renderDropdown(items) {
+        const list = document.getElementById('notif-list');
+        if (!list) return;
+
+        if (items.length === 0) {
+            list.innerHTML = '<li class="notif-empty">🎉 You\'re all caught up!</li>';
+            return;
+        }
+
+        list.innerHTML = items.map(n => `
+            <li class="notif-item${n.is_read == 1 ? ' notif-read' : ''}" data-id="${n.id}">
+                <a href="${n.link ? window.APP_BASE + n.link : '#'}"
+                   class="notif-link"
+                   onclick="NotifSystem.markRead(${n.id}, event)">
+                    <span class="notif-msg">${escapeHtml(n.message)}</span>
+                    <span class="notif-time">${timeAgo(n.created_at)}</span>
+                </a>
+            </li>`).join('');
+    }
+
+    function markRead(id, e) {
+        const fd = new FormData();
+        fd.append('type', 'single');
+        fd.append('id', id);
+        fetch(`${window.APP_BASE}/api/notify_read.php`, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(() => {
+                const item = document.querySelector(`.notif-item[data-id="${id}"]`);
+                if (item) item.classList.add('notif-read');
+                fetchNotifications(); // refresh badge count
+            });
+        // allow the link navigation to proceed
+    }
+
+    function markAllRead() {
+        const fd = new FormData();
+        fd.append('type', 'all');
+        fetch(`${window.APP_BASE}/api/notify_read.php`, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(() => {
+                updateBadge(0);
+                document.querySelectorAll('.notif-item').forEach(el => el.classList.add('notif-read'));
+                showToast('All notifications marked as read', 'success');
+            });
+    }
+
+    function toggleDropdown() {
+        const panel = document.getElementById('notif-panel');
+        if (!panel) return;
+        const isOpen = panel.classList.toggle('open');
+        if (isOpen) fetchNotifications(); // fresh data when opening
+    }
+
+    function init() {
+        // Close dropdown on outside click
+        document.addEventListener('click', (e) => {
+            const bell  = document.getElementById('notif-bell');
+            const panel = document.getElementById('notif-panel');
+            if (bell && panel && !bell.contains(e.target) && !panel.contains(e.target)) {
+                panel.classList.remove('open');
+            }
+        });
+
+        // Start polling
+        fetchNotifications();
+        pollTimer = setInterval(fetchNotifications, 30_000); // every 30 s
+    }
+
+    // Kick off when DOM ready (main.js is deferred / at bottom of body)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    return { fetchNotifications, markRead, markAllRead, toggleDropdown };
+})();
+
+// ── Simple time-ago helper ──
+function timeAgo(dateStr) {
+    const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+    if (diff < 60)  return 'just now';
+    if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+}

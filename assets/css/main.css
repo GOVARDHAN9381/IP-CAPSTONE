@@ -442,3 +442,96 @@ tbody tr:hover { background: rgba(255,255,255,.025); }
     body { background: #fff; color: #000; }
     .data-card { border: 1px solid #ddd; }
 }
+
+/* ── Notification Bell & Panel ── */
+.notif-badge {
+    position: absolute;
+    top: -2px; right: -2px;
+    min-width: 18px; height: 18px;
+    border-radius: 99px;
+    background: #f43f5e;
+    color: #fff;
+    font-size: .65rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-primary);
+    padding: 0 3px;
+    animation: notif-pop .3s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes notif-pop {
+    from { transform: scale(0); }
+    to   { transform: scale(1); }
+}
+.notif-panel {
+    position: absolute;
+    top: calc(100% + .75rem);
+    right: 0;
+    width: 340px;
+    max-height: 420px;
+    background: rgba(22,27,34,.97);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: 9000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.notif-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .85rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: rgba(99,102,241,.08);
+    flex-shrink: 0;
+}
+#notif-list {
+    overflow-y: auto;
+    max-height: 340px;
+}
+#notif-list::-webkit-scrollbar { width: 4px; }
+#notif-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
+.notif-item {
+    display: block;
+    padding: .85rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    text-decoration: none;
+    transition: background .15s;
+    cursor: pointer;
+}
+.notif-item:hover { background: rgba(255,255,255,.04); }
+.notif-item.unread { background: rgba(99,102,241,.08); border-left: 3px solid #6366f1; }
+.notif-msg { color: var(--text-secondary); font-size: .875rem; line-height: 1.5; }
+.notif-time { color: var(--text-muted); font-size: .72rem; margin-top: .2rem; }
+
+/* ── Idea Board tag pill ── */
+.idea-tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .2rem .6rem;
+    border-radius: 99px;
+    font-size: .75rem;
+    font-weight: 600;
+    background: rgba(99,102,241,.15);
+    color: #a5b4fc;
+    border: 1px solid rgba(99,102,241,.25);
+}
+
+/* ── Toast notification ── */
+.toast-container {
+    position: fixed;
+    bottom: 5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    align-items: center;
+}
+
