@@ -14,7 +14,9 @@
  *  stars     = max(1, ceil(pct_score / 20))        (1–5 stars)
  */
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../config/db.php';
 
 header('Content-Type: application/json');
@@ -117,9 +119,60 @@ foreach ($others as $other) {
 // Sort by score descending
 usort($results, fn($a, $b) => $b['score'] <=> $a['score']);
 
+$topRecommendations = array_slice($results, 0, $topN);
+
+// My student details for AI Context
+$myStudent = currentStudent();
+$mySkillNamesStmt = $db->prepare("SELECT name FROM skills WHERE id IN (SELECT skill_id FROM student_skills WHERE student_id = ?)");
+$mySkillNamesStmt->execute([$studentId]);
+$mySkillNamesList = implode(', ', array_column($mySkillNamesStmt->fetchAll(), 'name'));
+
+// Enrich top recommendations with Groq AI Match Reasoning in a single high-speed batch call
+$batchList = [];
+foreach ($topRecommendations as $rec) {
+    $sharedStr = !empty($rec['shared_skills']) ? implode(', ', array_column($rec['shared_skills'], 'name')) : 'None';
+    $compStr   = !empty($rec['comp_skills']) ? implode(', ', array_column($rec['comp_skills'], 'name')) : 'None';
+    $batchList[] = "- Candidate #{$rec['id']} ({$rec['name']}): Shared skills: [{$sharedStr}], Complementary skills: [{$compStr}]";
+}
+
+$aiPrompt = "Logged-in Student: {$myStudent['name']} (Skills: [{$mySkillNamesList}]).\n"
+          . "Candidates for project teaming:\n" . implode("\n", $batchList) . "\n\n"
+          . "For each candidate, write exactly 1 concise, engaging sentence (max 25 words) explaining why they are a great teammate for {$myStudent['name']}.\n"
+          . "Return ONLY a valid JSON object mapping string candidate IDs to their 1-sentence explanation. Example: {\"2\": \"Rahul brings React skills that complement your Java backend.\"}\nDo not include any extra text.";
+
+$rawAiResponse = callGroqAI($aiPrompt, "You are CollabIQ's AI Team Matchmaker. Return valid JSON only.");
+$aiReasonsMap = [];
+if (!empty($rawAiResponse)) {
+    // Extract JSON if wrapped in markdown code blocks
+    if (preg_match('/\{[\s\S]*\}/', $rawAiResponse, $matches)) {
+        $aiReasonsMap = json_decode($matches[0], true) ?: [];
+    }
+}
+
+foreach ($topRecommendations as &$rec) {
+    $cid = (string)$rec['id'];
+    $sharedStr = !empty($rec['shared_skills']) ? implode(', ', array_column($rec['shared_skills'], 'name')) : 'None';
+    $compStr   = !empty($rec['comp_skills']) ? implode(', ', array_column($rec['comp_skills'], 'name')) : 'None';
+
+    if (!empty($aiReasonsMap[$cid])) {
+        $rec['ai_reasoning'] = trim($aiReasonsMap[$cid]);
+    } else {
+        // High-quality deterministic fallback
+        if (!empty($rec['comp_skills']) && !empty($rec['shared_skills'])) {
+            $rec['ai_reasoning'] = "Brings valuable complementary skills in {$compStr} while sharing a strong technical foundation in {$sharedStr}.";
+        } elseif (!empty($rec['comp_skills'])) {
+            $rec['ai_reasoning'] = "Expands your team's technical capabilities with specialized expertise in {$compStr}.";
+        } else {
+            $rec['ai_reasoning'] = "Shares strong technical synergy in {$sharedStr} to accelerate project delivery.";
+        }
+    }
+}
+unset($rec);
+
 echo json_encode([
     'success'         => true,
     'my_skill_count'  => count($mySkills),
     'total_students'  => count($others),
-    'recommendations' => array_slice($results, 0, $topN),
+    'ai_model'        => GROQ_MODEL,
+    'recommendations' => $topRecommendations,
 ]);

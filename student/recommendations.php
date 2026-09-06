@@ -42,9 +42,15 @@ $student   = currentStudent();
         </aside>
 
         <main class="main-content">
-            <div class="page-header">
-                <h1>🤖 AI Team Recommendations</h1>
-                <p>Our algorithm analyzes skills and interests to find your ideal teammates.</p>
+            <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+                <div>
+                    <h1>🤖 AI Team Recommendations</h1>
+                    <p>Our algorithm and Groq AI analyze skills and interests to find your ideal teammates.</p>
+                </div>
+                <div style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);padding:.4rem .85rem;border-radius:99px;display:inline-flex;align-items:center;gap:.5rem;font-size:.8rem;color:#c4b5fd;">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></span>
+                    <span>⚡ <strong>Groq AI Engine</strong> Active</span>
+                </div>
             </div>
 
             <!-- Algorithm Explainer -->
@@ -52,7 +58,7 @@ $student   = currentStudent();
                 <div class="data-card-body" style="display:flex;gap:2rem;flex-wrap:wrap;align-items:center;">
                     <div style="flex:1;min-width:200px;">
                         <h3 style="margin-bottom:.5rem;">How the AI works</h3>
-                        <p class="text-sm text-muted">The matching engine scores each student using a weighted formula:</p>
+                        <p class="text-sm text-muted">The matching engine combines weighted set theory scoring with real-time Groq LLM compatibility analysis:</p>
                     </div>
                     <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
                         <div style="text-align:center;">
@@ -82,7 +88,7 @@ $student   = currentStudent();
             <!-- Recommendation Cards (loaded via JS) -->
             <div id="rec-loading" style="text-align:center;padding:4rem 0;">
                 <div style="font-size:3rem;animation:spin 1.5s linear infinite;display:inline-block;">⚙️</div>
-                <p style="margin-top:1rem;color:var(--text-muted);">Analyzing student profiles...</p>
+                <p style="margin-top:1rem;color:var(--text-muted);">Analyzing student profiles with Groq AI...</p>
             </div>
             <div id="rec-grid" class="rec-grid" style="display:none;"></div>
             <div id="rec-empty" style="display:none;" class="empty-state">
@@ -122,7 +128,16 @@ $student   = currentStudent();
                     <div class="stars" style="margin-top:.3rem;font-size:1.1rem;">${buildStars(rec.stars)}</div>
                 </div>
             </div>
-            ${rec.bio ? `<p class="text-sm text-muted" style="margin-bottom:.75rem;line-height:1.5;">"${rec.bio}"</p>` : ''}
+            ${rec.bio ? `<p class="text-sm text-muted" style="margin-bottom:.5rem;line-height:1.4;">"${rec.bio}"</p>` : ''}
+            
+            ${rec.ai_reasoning ? `
+            <div style="margin:.75rem 0;padding:.75rem 1rem;background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(6,182,212,.08));border:1px solid rgba(99,102,241,.3);border-radius:var(--radius-md);font-size:.85rem;line-height:1.5;color:#e2e8f0;">
+                <div style="display:flex;align-items:center;gap:.4rem;font-weight:700;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:#a5b4fc;margin-bottom:.25rem;">
+                    <span>🧠</span> AI Match Reason
+                </div>
+                <div>${rec.ai_reasoning}</div>
+            </div>` : ''}
+
             <div class="rec-score-bar">
                 <div class="rec-score-label">
                     <span class="text-xs text-muted">Match Score</span>
@@ -132,7 +147,7 @@ $student   = currentStudent();
                     <div class="progress-fill rec-score-fill" data-score="${rec.score}" style="width:0%"></div>
                 </div>
             </div>
-            ${allSkills ? `<div class="rec-skills" style="display:flex;flex-wrap:wrap;gap:.3rem;">${allSkills}</div>` : ''}
+            ${allSkills ? `<div class="rec-skills" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem;">${allSkills}</div>` : ''}
             <div style="display:flex;gap:.5rem;justify-content:space-between;align-items:center;margin-top:1rem;flex-wrap:wrap;">
                 <span class="text-xs text-muted">🎯 ${rec.interest_match} shared interests · 📁 ${rec.project_count} projects</span>
                 <a href="${BASE}/project/create.php?invite=${rec.id}" class="btn btn-secondary btn-sm">+ Invite to Project</a>

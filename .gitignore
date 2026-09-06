@@ -8,5 +8,10 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Local keys and environment
+/config/ai_keys.php
+.env
+.env.*
+
 # Uploaded assets if any local
 /assets/uploads/*.tmp

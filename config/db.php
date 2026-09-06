@@ -30,8 +30,93 @@ if (getenv('BASE_URL') !== false) {
     define('BASE_URL', '');
 }
 
+// Load local AI keys if present (ignored by Git)
+if (file_exists(__DIR__ . '/ai_keys.php')) {
+    require_once __DIR__ . '/ai_keys.php';
+}
+
+// Groq AI API Configuration (High-Speed LLM Inference)
+define('GROQ_API_KEY', getenv('GROQ_API_KEY') ?: '');
+define('GROQ_API_URL', 'https://api.groq.com/openai/v1/chat/completions');
+define('GROQ_MODEL',   'groq/compound-mini');
+
 define('UPLOAD_DIR', __DIR__ . '/../assets/uploads/');
 define('MAX_FILE_SIZE', 10 * 1024 * 1024); // 10 MB
+
+/**
+ * Call Groq Cloud LLM API for real-time generative intelligence
+ */
+function callGroqAI(string $prompt, string $systemMessage = 'You are CollabIQ AI, an intelligent academic team recommendation mentor.'): ?string {
+    $apiKey = GROQ_API_KEY;
+    if (empty($apiKey)) return null;
+
+    $payload = [
+        'model' => GROQ_MODEL,
+        'messages' => [
+            ['role' => 'system', 'content' => $systemMessage],
+            ['role' => 'user', 'content' => $prompt]
+        ],
+        'temperature' => 0.5,
+        'max_tokens' => 200
+    ];
+
+    $jsonPayload = json_encode($payload);
+
+    // Method 1: curl (if extension is loaded)
+    if (function_exists('curl_init')) {
+        try {
+            $ch = curl_init(GROQ_API_URL);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $apiKey
+                ],
+                CURLOPT_POSTFIELDS     => $jsonPayload,
+                CURLOPT_TIMEOUT        => 6,
+                CURLOPT_SSL_VERIFYPEER => false
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode === 200 && $response) {
+                $data = json_decode($response, true);
+                return trim($data['choices'][0]['message']['content'] ?? '');
+            }
+        } catch (\Throwable $e) {
+            // Fall through to stream context
+        }
+    }
+
+    // Method 2: stream context / file_get_contents (pure native PHP fallback)
+    try {
+        $opts = [
+            'http' => [
+                'method'  => 'POST',
+                'header'  => "Content-Type: application/json\r\n" .
+                             "Authorization: Bearer " . $apiKey . "\r\n",
+                'content' => $jsonPayload,
+                'timeout' => 6
+            ],
+            'ssl' => [
+                'verify_peer'      => false,
+                'verify_peer_name' => false
+            ]
+        ];
+        $context = stream_context_create($opts);
+        $result = @file_get_contents(GROQ_API_URL, false, $context);
+        if ($result !== false) {
+            $data = json_decode($result, true);
+            return trim($data['choices'][0]['message']['content'] ?? '');
+        }
+    } catch (\Throwable $e) {
+        error_log('Groq AI API error: ' . $e->getMessage());
+    }
+
+    return null;
+}
 
 /**
  * Returns a singleton PDO connection (Supabase PostgreSQL / Cloud DB or local MySQL).
