@@ -134,8 +134,9 @@ function getDB(): PDO {
                 $pgUser = urldecode($dbParts['user'] ?? DB_USER);
                 $pgPass = urldecode($dbParts['pass'] ?? DB_PASS);
                 $pgName = ltrim($dbParts['path'] ?? 'postgres', '/');
+                $sslMode = (str_contains($pgHost, 'railway.internal') || $pgHost === 'localhost' || $pgHost === '127.0.0.1') ? 'prefer' : 'require';
 
-                $dsnPg = sprintf('pgsql:host=%s;port=%s;dbname=%s;sslmode=require', $pgHost, $pgPort, $pgName);
+                $dsnPg = sprintf('pgsql:host=%s;port=%s;dbname=%s;sslmode=%s', $pgHost, $pgPort, $pgName, $sslMode);
                 $pdo = new PDO($dsnPg, $pgUser, $pgPass, [
                     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -153,9 +154,10 @@ function getDB(): PDO {
 
         if ($isCloud) {
             try {
+                $sslMode = (str_contains(DB_HOST, 'railway.internal') || DB_HOST === 'localhost' || DB_HOST === '127.0.0.1') ? 'prefer' : 'require';
                 $dsnPg = sprintf(
-                    'pgsql:host=%s;port=%s;dbname=%s;sslmode=require',
-                    DB_HOST, DB_PORT, DB_NAME
+                    'pgsql:host=%s;port=%s;dbname=%s;sslmode=%s',
+                    DB_HOST, DB_PORT, DB_NAME, $sslMode
                 );
                 $pdo = new PDO($dsnPg, DB_USER, DB_PASS, [
                     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -167,11 +169,16 @@ function getDB(): PDO {
             } catch (PDOException $ePg) {
                 error_log('Supabase DB connection failed: ' . $ePg->getMessage());
                 http_response_code(500);
-                die('<div style="font-family:sans-serif;padding:30px;max-width:600px;margin:auto;background:#fee2e2;border:1px solid #ef4444;border-radius:10px;color:#991b1b;">'
-                  . '<h3 style="margin-top:0;">Database Connection Error</h3>'
-                  . '<p>Could not connect to Supabase PostgreSQL at <code>' . htmlspecialchars(DB_HOST) . '</code>.</p>'
-                  . '<p><strong>Details:</strong> ' . htmlspecialchars($ePg->getMessage()) . '</p>'
-                  . '<p>Please check your Railway <strong>Variables</strong> tab for <code>DB_HOST</code>, <code>DB_USER</code>, and <code>DB_PASS</code>.</p>'
+                $isTenantNotFound = str_contains($ePg->getMessage(), 'tenant/user') || str_contains($ePg->getMessage(), 'ENOTFOUND');
+                die('<div style="font-family:system-ui,-apple-system,sans-serif;padding:30px;max-width:680px;margin:40px auto;background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;color:#9f1239;box-shadow:0 10px 25px rgba(0,0,0,0.08);">'
+                  . '<h2 style="margin-top:0;font-size:1.3rem;">⚠️ Database Connection Error</h2>'
+                  . '<p>Could not connect to PostgreSQL at <code>' . htmlspecialchars(DB_HOST) . '</code>.</p>'
+                  . '<div style="background:#ffe4e6;padding:12px 16px;border-radius:8px;font-family:monospace;font-size:0.85rem;word-break:break-all;margin-bottom:16px;">' . htmlspecialchars($ePg->getMessage()) . '</div>'
+                  . ($isTenantNotFound ? '<div style="background:#ecfdf5;border:1px solid #a7f3d0;padding:14px;border-radius:8px;color:#065f46;margin-bottom:16px;">'
+                     . '<strong>💡 Project Paused in Supabase:</strong><br>'
+                     . 'Supabase pauses free projects after 7 days of inactivity. Go to <a href="https://supabase.com/dashboard" target="_blank" style="color:#059669;font-weight:bold;text-decoration:underline;">Supabase Dashboard</a> and click <strong>"Restore project"</strong> (takes ~1 min).'
+                     . '</div>' : '')
+                  . '<p style="font-size:0.9rem;margin:0;">Verify your Railway <strong>Variables</strong> tab for <code>DB_HOST</code>, <code>DB_USER</code>, <code>DB_PASS</code>, or add a Railway PostgreSQL service.</p>'
                   . '</div>');
             }
         }
