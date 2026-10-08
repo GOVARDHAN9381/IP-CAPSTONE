@@ -29,16 +29,42 @@ git push -u origin main
 
 ## 🚂 Option 2: Deploy to Railway
 
-1. Go to **[railway.app](https://railway.app)** and click **New Project**.
-2. Select **Deploy from GitHub repo** and pick your `collabiq` repository.
-3. Add the following **Environment Variables** in Railway Dashboard:
+### Method A: Connect GitHub Repository (Automatic Deployments)
+1. Go to **[railway.com / railway.app](https://railway.app)** and log in.
+2. Select your project (the one with domain `ip-capstone-production.up.railway.app`).
+3. If no service is created yet, or if you see **"Application not found (404)"**:
+   - Click **+ Create / Deploy** $\rightarrow$ **GitHub Repo**.
+   - Select **`GOVARDHAN9381/IP-CAPSTONE`** (branch: `main`).
+4. In your Service $\rightarrow$ **Settings** $\rightarrow$ **Networking**:
+   - Under **Public Networking**, ensure the domain `ip-capstone-production.up.railway.app` is linked to this service.
+5. In your Service $\rightarrow$ **Variables**, add:
    - `DB_HOST`: `db.sbzecviaqezsbouymecf.supabase.co`
    - `DB_PORT`: `5432`
    - `DB_NAME`: `postgres`
    - `DB_USER`: `postgres`
    - `DB_PASS`: `Govardhan@26`
    - `BASE_URL`: `""`
-4. Click **Deploy**. Railway will generate your public `*.up.railway.app` URL.
+   - `GROQ_API_KEY`: *(Optional: your Groq API key for AI features)*
+6. Click **Deploy** (or trigger a new redeployment). Once the build finishes, `https://ip-capstone-production.up.railway.app/` will be live.
+
+### Method B: Deploy from Terminal via Railway CLI
+If you prefer deploying straight from this folder:
+```powershell
+# 1. Log in to Railway in your browser
+npx @railway/cli login
+
+# 2. Link to your existing Railway project
+npx @railway/cli link
+
+# 3. Deploy the application
+npx @railway/cli up
+```
+
+### 🔍 Why did `ip-capstone-production.up.railway.app` return 404?
+Railway returns `{"status":"error","code":404,"message":"Application not found"}` when:
+- The domain was generated, but no active deployment has succeeded on that service yet.
+- The service build is still running or waiting for GitHub connection.
+- Linking the GitHub repository `GOVARDHAN9381/IP-CAPSTONE` and completing the first deploy immediately activates the domain.
 
 ---
 
